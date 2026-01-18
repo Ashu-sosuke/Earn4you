@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import api from "../api/axios";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, ArrowRight, User, Eye, EyeOff, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -15,19 +16,27 @@ export default function Login() {
     setError("");
     setLoading(true);
 
-    // Fake delay for demo
-    setTimeout(() => {
-      if (formData.email && formData.password) {
-        if (formData.email === 'admin@example.com') {
+    try {
+      const response = await api.post('/auth/login', {
+        email: formData.email,
+        password: formData.password
+      });
+
+      if (response.data.success) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+
+        if (response.data.user.email === 'admin@earn4you.com') {
           navigate("/admin/dashboard");
         } else {
           navigate("/dashboard");
         }
-      } else {
-        setError("Invalid credentials");
       }
+    } catch (err) {
+      setError(err.response?.data?.message || "Login failed. Please try again.");
+    } finally {
       setLoading(false);
-    }, 900);
+    }
   };
 
   return (

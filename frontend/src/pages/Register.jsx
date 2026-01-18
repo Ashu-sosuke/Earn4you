@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from "../api/axios";
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, User, UserPlus } from 'lucide-react';
 
@@ -11,14 +12,28 @@ const Register = () => {
         confirmPassword: ''
     });
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (formData.password !== formData.confirmPassword) {
             alert("Passwords don't match!");
             return;
         }
-        // Simulate register
-        navigate('/dashboard');
+
+        try {
+            const response = await api.post('/auth/register', {
+                username: formData.name, // Mapping name to username
+                email: formData.email,
+                password: formData.password
+            });
+
+            if (response.data.success) {
+                localStorage.setItem('token', response.data.token);
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+                navigate('/dashboard');
+            }
+        } catch (error) {
+            alert(error.response?.data?.message || "Registration failed");
+        }
     };
 
     return (

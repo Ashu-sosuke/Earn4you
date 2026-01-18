@@ -8,7 +8,7 @@ import Referral from '../models/Referral.js';
 // @access  Private
 export const initiatePayment = async (req, res) => {
   try {
-    const { planId, walletAddress } = req.body;
+    const { planId, walletAddress, transactionHash } = req.body;
 
     // Get plan details
     const plan = await Plan.findById(planId);
@@ -22,6 +22,7 @@ export const initiatePayment = async (req, res) => {
       planId,
       amount: plan.price,
       walletAddress,
+      transactionHash,
     });
 
     await payment.save();

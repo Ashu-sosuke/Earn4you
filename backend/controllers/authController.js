@@ -84,7 +84,7 @@ export const login = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user._id, 'user');
+    const token = generateToken(user._id, user.role);
 
     res.status(200).json({
       success: true,
@@ -96,6 +96,7 @@ export const login = async (req, res) => {
         plan: user.plan,
         paymentStatus: user.paymentStatus,
         referralCode: user.referralCode,
+        role: user.role,
       },
     });
   } catch (error) {

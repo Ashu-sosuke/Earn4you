@@ -1,7 +1,7 @@
 import express from 'express';
 import {
   getAllUsers,
-  getPendingPaymentsAdmin,
+  getAdminPayments,
   verifyPayment,
   rejectPayment,
   getReferralNetwork,
@@ -20,7 +20,7 @@ router.use(protect, adminOnly);
 router.get('/users', getAllUsers);
 
 // Payment management
-router.get('/payments/pending', getPendingPaymentsAdmin);
+router.get('/payments', getAdminPayments);
 router.post('/payments/verify/:paymentId', verifyPayment);
 router.post('/payments/reject/:paymentId', rejectPayment);
 

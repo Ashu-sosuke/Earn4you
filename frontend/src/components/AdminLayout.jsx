@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
 import { Menu, Search } from 'lucide-react';
 
 const AdminLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const navigate = useNavigate();
+
+    React.useEffect(() => {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.role !== 'admin') {
+            navigate('/login');
+        }
+    }, [navigate]);
 
     return (
         <div className="min-h-screen bg-black text-white">

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import api from "../api/axios";
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, User, UserPlus } from 'lucide-react';
 
 const Register = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const referralCode = searchParams.get('ref');
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -23,7 +25,8 @@ const Register = () => {
             const response = await api.post('/auth/register', {
                 username: formData.name, // Mapping name to username
                 email: formData.email,
-                password: formData.password
+                password: formData.password,
+                referralCode: referralCode || undefined
             });
 
             if (response.data.success) {

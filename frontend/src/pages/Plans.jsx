@@ -1,55 +1,38 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import PricingCard from '../components/PricingCard';
 import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
 
 const Plans = () => {
     const navigate = useNavigate();
+    const [plans, setPlans] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const response = await api.get('/plans');
+                if (response.data.success) {
+                    setPlans(response.data.data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch plans", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPlans();
+    }, []);
 
     const handleSelectPlan = (plan) => {
         // Navigate to payment with plan details
         navigate('/payment', { state: { plan } });
     };
 
-    const plans = [
-        {
-            name: 'Basic',
-            price: '100',
-            features: [
-                '5% Weekly Returns',
-                'Standard Support',
-                'Direct Wallet Cashout',
-                'Basic Analytics',
-                '30 Days contract'
-            ],
-            recommended: false
-        },
-        {
-            name: 'Pro',
-            price: '500',
-            features: [
-                '8% Weekly Returns',
-                'Priority Support 24/7',
-                'Instant Cashout',
-                'Advanced Analytics',
-                'Personal Advisor',
-                '60 Days contract'
-            ],
-            recommended: true
-        },
-        {
-            name: 'Premium',
-            price: '1000',
-            features: [
-                '12% Weekly Returns',
-                'VIP Dedicated Support',
-                'Zero Fee Cashout',
-                'Full Portfolio Access',
-                'Exclusive Events',
-                '90 Days contract'
-            ],
-            recommended: false
-        }
-    ];
+    if (loading) {
+        return <div className="text-white text-center mt-20">Loading plans...</div>;
+    }
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -62,7 +45,7 @@ const Plans = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
                 {plans.map((plan) => (
-                    <PricingCard key={plan.name} plan={plan} onSelect={handleSelectPlan} />
+                    <PricingCard key={plan._id} plan={plan} onSelect={handleSelectPlan} />
                 ))}
             </div>
         </div>

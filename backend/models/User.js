@@ -20,7 +20,8 @@ const userSchema = new mongoose.Schema(
     },
     walletAddress: {
       type: String,
-      required: true,
+      required: false,
+      default: null,
     },
     referralCode: {
       type: String,
@@ -61,6 +62,11 @@ const userSchema = new mongoose.Schema(
     createdAt: {
       type: Date,
       default: Date.now,
+    },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
     },
   },
   { timestamps: true }

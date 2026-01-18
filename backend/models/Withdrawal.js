@@ -9,7 +9,16 @@ const withdrawalSchema = new mongoose.Schema(
     },
     amount: {
       type: Number,
-      required: true,
+      required: true, // Gross amount requested by user
+    },
+    fee: {
+      type: Number,
+      required: true, 
+      default: 0
+    },
+    netAmount: {
+      type: Number,
+      required: true, // Amount to be sent (Amount - Fee)
     },
     walletAddress: {
       type: String,

@@ -7,6 +7,7 @@ import userRoutes from './routes/user.js';
 import paymentRoutes from './routes/payments.js';
 import withdrawalRoutes from './routes/withdrawals.js';
 import adminRoutes from './routes/admin.js';
+import planRoutes from './routes/plans.js';
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/plans', planRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

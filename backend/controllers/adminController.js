@@ -19,12 +19,25 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
-// @desc    Get pending payments (Admin)
-// @route   GET /api/admin/payments/pending
+// @desc    Get payments (Admin)
+// @route   GET /api/admin/payments
 // @access  Private/Admin
-export const getPendingPaymentsAdmin = async (req, res) => {
+export const getAdminPayments = async (req, res) => {
   try {
-    const payments = await Payment.find({ status: 'pending' })
+    const { status } = req.query;
+    const query = {};
+    if (status) {
+      if (status === 'Pending') query.status = 'pending';
+      else if (status === 'Approved') query.status = 'verified';
+      else if (status === 'Rejected') query.status = 'failed';
+      // Handle lowercase too if needed, but frontend sends capitalized tabs usually
+      // Let's make it case insensitive or stick to lowercase
+      if (status.toLowerCase() === 'pending') query.status = 'pending';
+      if (status.toLowerCase() === 'approved') query.status = 'verified';
+      if (status.toLowerCase() === 'rejected') query.status = 'failed';
+    }
+
+    const payments = await Payment.find(query)
       .populate('userId', 'username email walletAddress')
       .populate('planId', 'name price')
       .sort({ createdAt: -1 });
@@ -41,6 +54,14 @@ export const getPendingPaymentsAdmin = async (req, res) => {
 // @desc    Verify payment (Admin)
 // @route   POST /api/admin/payments/verify/:paymentId
 // @access  Private/Admin
+import Transaction from '../models/Transaction.js';
+import { REFERRAL_L1_PERCENT, REFERRAL_L2_PERCENT, REFERRAL_L3_PERCENT } from '../config/constants.js';
+
+// ... other imports ...
+
+// @desc    Verify payment (Admin)
+// @route   POST /api/admin/payments/verify/:paymentId
+// @access  Private/Admin
 export const verifyPayment = async (req, res) => {
   try {
     const { verificationNotes } = req.body;
@@ -51,11 +72,15 @@ export const verifyPayment = async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
 
+    if (payment.status === 'verified') {
+      return res.status(400).json({ message: 'Payment already verified' });
+    }
+
     // Update payment status
     payment.status = 'verified';
     payment.verifiedBy = req.user.id;
     payment.verifiedAt = new Date();
-    payment.verificationNotes = verificationNotes;
+    payment.verificationNotes = verificationNotes || 'Verified by Admin';
 
     // Update user
     const user = await User.findById(payment.userId);
@@ -63,31 +88,80 @@ export const verifyPayment = async (req, res) => {
     user.paymentStatus = 'completed';
     user.isActive = true;
 
-    // Get plan for referral commission
+    // Get plan for referral commission base
     const plan = await Plan.findById(payment.planId);
+    const planPrice = plan.price;
 
-    // Handle referral commission
+    // --- MLM Referral Logic (3 Levels) ---
+
+    // Level 1 (Direct Referrer)
     if (user.referredBy) {
-      const referralCommission = (plan.price * plan.referralCommission) / 100;
-      
-      const referrer = await User.findById(user.referredBy);
-      referrer.totalEarnings += referralCommission;
-      referrer.availableBalance += referralCommission;
-      await referrer.save();
+      const referrerL1 = await User.findById(user.referredBy);
+      if (referrerL1) {
+        const commissionL1 = (planPrice * REFERRAL_L1_PERCENT) / 100;
 
-      // Create referral record
-      const referral = new (require('../models/Referral.js').default)({
-        referrer: user.referredBy,
-        referralCode: user.referralCode,
-        referredUser: payment.userId,
-        commission: referralCommission,
-        paymentId,
-        status: 'completed',
-      });
-      await referral.save();
+        referrerL1.totalEarnings += commissionL1;
+        referrerL1.availableBalance += commissionL1;
+        await referrerL1.save();
 
-      payment.referralBonus = referralCommission;
-      payment.referredByUser = user.referredBy;
+        // Transaction Record L1
+        await Transaction.create({
+          userId: referrerL1._id,
+          amount: commissionL1,
+          type: 'referral_bonus_l1',
+          description: `Level 1 Commission from ${user.username}`,
+          referenceId: payment._id,
+          details: { fromUser: user.username, level: 1 }
+        });
+
+        // Update Payment with L1 info (legacy support)
+        payment.referralBonus = commissionL1;
+        payment.referredByUser = referrerL1._id;
+
+        // Level 2 (Indirect Referrer)
+        if (referrerL1.referredBy) {
+          const referrerL2 = await User.findById(referrerL1.referredBy);
+          if (referrerL2) {
+            const commissionL2 = (planPrice * REFERRAL_L2_PERCENT) / 100;
+
+            referrerL2.totalEarnings += commissionL2;
+            referrerL2.availableBalance += commissionL2;
+            await referrerL2.save();
+
+            // Transaction Record L2
+            await Transaction.create({
+              userId: referrerL2._id,
+              amount: commissionL2,
+              type: 'referral_bonus_l2',
+              description: `Level 2 Commission from ${user.username} (via ${referrerL1.username})`,
+              referenceId: payment._id,
+              details: { fromUser: user.username, riskSource: referrerL1.username, level: 2 }
+            });
+
+            // Level 3 (Deep Referrer)
+            if (referrerL2.referredBy) {
+              const referrerL3 = await User.findById(referrerL2.referredBy);
+              if (referrerL3) {
+                const commissionL3 = (planPrice * REFERRAL_L3_PERCENT) / 100;
+
+                referrerL3.totalEarnings += commissionL3;
+                referrerL3.availableBalance += commissionL3;
+                await referrerL3.save();
+
+                // Transaction Record L3
+                await Transaction.create({
+                  userId: referrerL3._id,
+                  amount: commissionL3,
+                  type: 'referral_bonus_l3',
+                  description: `Level 3 Commission from ${user.username} (via ${referrerL2.username})`,
+                  referenceId: payment._id,
+                  details: { fromUser: user.username, riskSource: referrerL2.username, level: 3 }
+                });
+              }
+            }
+          }
+        }
+      }
     }
 
     await payment.save();
@@ -95,10 +169,11 @@ export const verifyPayment = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Payment verified successfully',
+      message: 'Payment verified successfully and commissions distributed',
       data: payment,
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -219,16 +294,16 @@ export const approveWithdrawal = async (req, res) => {
       return res.status(404).json({ message: 'Withdrawal not found' });
     }
 
+    if (withdrawal.status !== 'pending') {
+        return res.status(400).json({ message: 'Withdrawal already processed' });
+    }
+
     withdrawal.status = 'completed';
     withdrawal.transactionHash = transactionHash;
     withdrawal.approvedBy = req.user.id;
     withdrawal.completedAt = new Date();
 
-    // Update user balance
-    const user = await User.findById(withdrawal.userId);
-    user.availableBalance -= withdrawal.amount;
-    await user.save();
-
+    // Balance was already deducted at request time, so we just save the withdrawal
     await withdrawal.save();
 
     res.status(200).json({
@@ -254,16 +329,30 @@ export const rejectWithdrawal = async (req, res) => {
       return res.status(404).json({ message: 'Withdrawal not found' });
     }
 
+    if (withdrawal.status !== 'pending') {
+        return res.status(400).json({ message: 'Withdrawal already processed' });
+    }
+
     withdrawal.status = 'failed';
     withdrawal.rejectionReason = rejectionReason;
     withdrawal.approvedBy = req.user.id;
+    withdrawal.completedAt = new Date(); // Using completedAt to mark end of lifecycle
 
-    // Refund balance to user
+    // Refund balance to user (Amount was deducted on request, so we add it back)
     const user = await User.findById(withdrawal.userId);
     user.availableBalance += withdrawal.amount;
     await user.save();
 
     await withdrawal.save();
+
+    // Create Transaction Record for Refund
+    await Transaction.create({
+        userId: user._id,
+        amount: withdrawal.amount,
+        type: 'deposit', // Treated as deposit/refund
+        description: `Refund: Withdrawal Rejected (${rejectionReason})`,
+        referenceId: withdrawal._id,
+    });
 
     res.status(200).json({
       success: true,

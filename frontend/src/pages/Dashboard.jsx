@@ -1,106 +1,121 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import api from '../api/axios';
 import StatCard from '../components/StatCard';
-import { ShieldCheck, Wallet, Activity, TrendingUp } from 'lucide-react';
+import { ShieldCheck, Wallet, Activity, TrendingUp, Copy, CheckCircle } from 'lucide-react';
 
 const Dashboard = () => {
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [copied, setCopied] = useState(false);
+
+    useEffect(() => {
+        const fetchDashboard = async () => {
+            try {
+                const response = await api.get('/user/dashboard');
+                if (response.data.success) {
+                    setUser(response.data.data.user);
+                }
+            } catch (error) {
+                console.error("Failed to fetch dashboard data", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDashboard();
+    }, []);
+
+    const copyReferralLink = () => {
+        const link = `${window.location.origin}/register?ref=${user?.referralCode}`;
+        navigator.clipboard.writeText(link);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (loading) {
+        return <div className="text-white text-center mt-20">Loading dashboard...</div>;
+    }
+
+    if (!user) {
+        return <div className="text-white text-center mt-20">Failed to load user data.</div>;
+    }
+
     return (
         <div className="space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h1>
-                <p className="text-slate-400">Welcome back, check your investment status.</p>
+            <div className="flex justify-between items-end">
+                <div>
+                    <h1 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h1>
+                    <p className="text-slate-400">Welcome back, {user.username}.</p>
+                </div>
+                {/* Referral Link Card (Small) */}
+                <div className="hidden md:block bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                     <p className="text-xs text-slate-400 mb-1">Your Referral Code</p>
+                     <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-mono font-bold">{user.referralCode}</span>
+                        <button onClick={copyReferralLink} className="text-slate-400 hover:text-white transition-colors">
+                            {copied ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                     </div>
+                </div>
             </div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <StatCard
                     title="Active Plan"
-                    value="Premium Plan"
-                    status="Active"
+                    value={user.plan ? user.plan.name : "No Plan"}
+                    status={user.isActive ? "Active" : "Inactive"}
                     icon={ShieldCheck}
                     color="purple"
-                    subValue="Expires in 28 days"
+                    subValue={user.plan ? `Price: ${user.plan.price} ${user.plan.currency}` : "Upgrade now"}
                 />
 
                 <StatCard
-                    title="Total Invested"
-                    value="2,500 USDT"
+                    title="Available Balance"
+                    value={`${user.availableBalance} USDT`}
                     icon={Wallet}
-                    color="blue"
-                    subValue="+500 USDT this month"
+                    color="emerald"
+                    subValue={`Total Earned: ${user.totalEarnings} USDT`}
                 />
 
                 <StatCard
                     title="Payment Status"
-                    value="Verified"
-                    status="Active"
+                    value={user.paymentStatus === 'completed' ? "Verified" : "Pending"}
+                    status={user.paymentStatus}
                     icon={Activity}
-                    color="emerald"
-                    subValue="Last payment: 2 days ago"
+                    color="blue"
+                    subValue={user.isActive ? "Account is active" : "Needs activation"}
                 />
             </div>
 
-            {/* Recent Activity / Chart Placeholder */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Main Chart Area */}
-                <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-bold text-white">Earnings Growth</h3>
-                        <select className="bg-slate-800 border-none text-slate-400 text-sm rounded-lg focus:ring-0 cursor-pointer p-2">
-                            <option>Last 7 Days</option>
-                            <option>Last 30 Days</option>
-                            <option>All Time</option>
-                        </select>
+            {/* Referral Section (Mobile/Prominent) */}
+            <div className="bg-gradient-to-r from-emerald-900/40 to-teal-900/40 border border-emerald-500/30 rounded-2xl p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                
+                <h3 className="text-xl font-bold text-white mb-2 relative z-10">Refer & Earn</h3>
+                <p className="text-slate-300 mb-4 max-w-2xl relative z-10">
+                    Share your unique referral link with friends and earn commissions when they subscribe to a plan.
+                </p>
+                
+                <div className="flex items-center gap-4 relative z-10 max-w-md">
+                    <div className="flex-1 bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 font-mono text-sm truncate">
+                        {`${window.location.origin}/register?ref=${user.referralCode}`}
                     </div>
-
-                    {/* Chart Placeholder */}
-                    <div className="h-64 flex items-end gap-4 px-4 pb-4 border-b border-slate-800/50">
-                        {[40, 70, 45, 90, 60, 80, 95].map((height, i) => (
-                            <div key={i} className="flex-1 group relative">
-                                <div
-                                    className="bg-gradient-to-t from-cyan-500/20 to-cyan-500 rounded-t-lg transition-all duration-300 hover:opacity-80"
-                                    style={{ height: `${height}%` }}
-                                ></div>
-                                <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-xs text-white px-2 py-1 rounded border border-slate-700 transition-opacity">
-                                    {height}%
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="flex justify-between mt-4 text-xs text-slate-500">
-                        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-                    </div>
+                    <button 
+                        onClick={copyReferralLink}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center gap-2"
+                    >
+                        {copied ? 'Copied!' : 'Copy Link'}
+                        <Copy className="w-4 h-4" />
+                    </button>
                 </div>
+            </div>
 
-                {/* Recent Transactions */}
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-bold text-white">Recent Transactions</h3>
-                    </div>
-
-                    <div className="space-y-4">
-                        {[
-                            { type: 'Deposit', amount: '+500 USDT', date: 'Today, 10:23 AM', status: 'Completed' },
-                            { type: 'Withdrawal', amount: '-200 USDT', date: 'Yesterday, 4:00 PM', status: 'Pending' },
-                            { type: 'Deposit', amount: '+1000 USDT', date: 'Jan 15, 2026', status: 'Completed' }
-                        ].map((tx, i) => (
-                            <div key={i} className="flex items-center justify-between p-3 hover:bg-slate-800/50 rounded-xl transition-colors cursor-pointer">
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${tx.type === 'Deposit' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-orange-500/10 text-orange-400'}`}>
-                                        <TrendingUp className={`w-4 h-4 ${tx.type === 'Withdrawal' ? 'rotate-180' : ''}`} />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-white">{tx.type}</p>
-                                        <p className="text-xs text-slate-500">{tx.date}</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className={`text-sm font-bold ${tx.type === 'Deposit' ? 'text-emerald-400' : 'text-white'}`}>{tx.amount}</p>
-                                    <p className="text-xs text-slate-500">{tx.status}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+            {/* Referrals List Placeholder (Would need another API call) */}
+            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+                 <h3 className="text-lg font-bold text-white mb-4">Your Referral Network</h3>
+                 <p className="text-slate-400">Refer users to see them appear here and earn rewards.</p>
+                 {/* Logic to list referred users can be added here later */}
             </div>
         </div>
     );

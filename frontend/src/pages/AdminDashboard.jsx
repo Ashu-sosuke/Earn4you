@@ -1,38 +1,56 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import DataTable from '../components/DataTable';
+import api from '../api/axios';
 
 const AdminDashboard = () => {
-    // Mock Data
-    const userData = [
-        { id: 1, name: 'Alice Smith', email: 'alice@example.com', plan: 'Basic', invested: '100 USDT', wallet: '0x123...abc', txHash: '0xabc...123', date: '2026-01-15', status: 'Approved' },
-        { id: 2, name: 'Bob Jones', email: 'bob@example.com', plan: 'Premium', invested: '1000 USDT', wallet: '0x456...def', txHash: '0xdef...456', date: '2026-01-16', status: 'Pending' },
-        { id: 3, name: 'Charlie Day', email: 'charlie@example.com', plan: 'Pro', invested: '500 USDT', wallet: '0x789...ghi', txHash: '0xghi...789', date: '2026-01-17', status: 'Approved' },
-    ];
+    const [stats, setStats] = useState({
+        totalUsers: 0,
+        activeUsers: 0,
+        pendingPayments: 0,
+        verifiedPayments: 0,
+        totalRevenue: 0
+    });
+    const [recentPayments, setRecentPayments] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                const statsRes = await api.get('/admin/stats');
+                if (statsRes.data.success) {
+                    setStats(statsRes.data.data);
+                }
+
+                const paymentsRes = await api.get('/admin/payments?status=pending');
+                if (paymentsRes.data.success) {
+                    setRecentPayments(paymentsRes.data.data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch admin dashboard", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDashboardData();
+    }, []);
 
     const columns = [
-        { header: 'User', accessor: 'name' }, // Or custom render with avatar
-        { header: 'Email', accessor: 'email' },
-        {
-            header: 'Plan', accessor: 'plan', render: (row) => (
-                <span className={`px-2 py-1 rounded text-xs font-medium bg-slate-800 border border-slate-700 text-slate-300`}>
-                    {row.plan}
-                </span>
-            )
-        },
-        { header: 'Invested', accessor: 'invested', render: (row) => <span className="font-bold text-emerald-400">{row.invested}</span> },
-        { header: 'Wallet', accessor: 'wallet', render: (row) => <span className="font-mono text-xs text-slate-500">{row.wallet}</span> },
+        { header: 'User', accessor: 'userId.username' },
+        { header: 'Amount', accessor: 'amount', render: (row) => <span className="font-bold text-emerald-400">{row.amount} USDT</span> },
+        { header: 'Plan', accessor: 'planId.name' },
+        { header: 'Hash', accessor: 'transactionHash', render: (row) => <span className="font-mono text-xs text-slate-500">{row.transactionHash?.substring(0, 10)}...</span> },
         {
             header: 'Status', accessor: 'status', render: (row) => (
-                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${row.status === 'Approved'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                        : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                    }`}>
+                <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
                     {row.status}
                 </span>
             )
         },
-        { header: 'Date', accessor: 'date' },
+        { header: 'Date', accessor: 'createdAt', render: (row) => new Date(row.createdAt).toLocaleDateString() },
     ];
+
+    if (loading) return <div>Loading...</div>;
 
     return (
         <div className="space-y-6">
@@ -45,10 +63,10 @@ const AdminDashboard = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 {[
-                    { label: 'Total Users', value: '1,234' },
-                    { label: 'Total Invested', value: '$45,000' },
-                    { label: 'Pending Approvals', value: '5', highlight: true },
-                    { label: 'Today\'s Deposits', value: '$2,500' }
+                    { label: 'Total Users', value: stats.totalUsers },
+                    { label: 'Total Revenue', value: `$${stats.totalRevenue}` },
+                    { label: 'Pending Approvals', value: stats.pendingPayments, highlight: true },
+                    { label: 'Active Users', value: stats.activeUsers }
                 ].map((stat, i) => (
                     <div key={i} className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                         <p className="text-slate-500 text-sm mb-1">{stat.label}</p>
@@ -58,10 +76,10 @@ const AdminDashboard = () => {
             </div>
 
             <DataTable
-                title="Recent Investments"
+                title="Pending Investments"
                 columns={columns}
-                data={userData}
-                searchPlaceholder="Search by name, email or hash..."
+                data={recentPayments}
+                searchPlaceholder="Search..."
             />
         </div>
     );
